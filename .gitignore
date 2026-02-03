@@ -1,0 +1,22 @@
+# ===== Secrets =====
+.env
+*.env
+serviceAccountKey.json
+
+# ===== Python =====
+venv/
+backend/venv/
+__pycache__/
+*.pyc
+
+# ===== Node / Next.js =====
+node_modules/
+aub-rate/node_modules/
+.next/
+aub-rate/.next/
+out/
+aub-rate/out/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
