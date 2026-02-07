@@ -1,76 +1,142 @@
-// Language: TSX (React + TypeScript)
+// Language: TypeScript (React in Next.js)
 "use client";
 
 import { useState } from "react";
-import { registerSchema } from "@/lib/validators";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { apiFetch } from "@/lib/api";
+import { requestOtpSchema, verifyOtpSchema } from "@/lib/validators";
+
+type Step = "form" | "otp";
 
 export default function RegisterPage() {
+  const [step, setStep] = useState<Step>("form");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const [otp, setOtp] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  async function handleRegister() {
+  async function handleRequestOtp() {
     setError(null);
-    setSuccess(null);
+    setMessage(null);
 
-    // 1) Validate inputs using Zod
-    const parsed = registerSchema.safeParse({ email, password });
+    const parsed = requestOtpSchema.safeParse({ email, password });
     if (!parsed.success) {
-      // get the first error message
-      setError(parsed.error.issues[0]?.message ?? "Invalid input");
+      setError(parsed.error.issues[0]?.message || "Invalid input");
       return;
     }
 
-    try {
-      setLoading(true);
+    await apiFetch<{ message: string }>("/auth/register/request-otp", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
 
-      // 2) Create Firebase user (temporary step — later backend controls OTP + disabled user)
-      await createUserWithEmailAndPassword(auth, email, password);
+    setMessage("OTP requested. Check your email (or backend console in dev).");
+    setStep("otp");
+  }
 
-      setSuccess("Account created ✅ (Next step: OTP verification flow)");
-    } catch (e: any) {
-      setError(e?.message ?? "Registration failed");
-    } finally {
-      setLoading(false);
+  async function handleVerifyOtp() {
+    setError(null);
+    setMessage(null);
+
+    const parsed = verifyOtpSchema.safeParse({ email, otp });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message || "Invalid OTP");
+      return;
     }
+
+    const res = await apiFetch<{ message: string }>("/auth/register/verify-otp", {
+      method: "POST",
+      body: JSON.stringify({ email, otp }),
+    });
+
+    setMessage(res.message);
+    // redirect to login after a short moment
+    setTimeout(() => {
+      window.location.href = "/login";
+    }, 800);
   }
 
   return (
-    <main style={{ maxWidth: 420, margin: "60px auto", fontFamily: "sans-serif" }}>
-      <h1 style={{ fontSize: 28, marginBottom: 20 }}>Register</h1>
+    <main style={{ maxWidth: 420, margin: "40px auto", fontFamily: "system-ui" }}>
+      <h1>Register</h1>
 
-      <label>Email (AUB only)</label>
-      <input
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="ina06@mail.aub.edu"
-        style={{ width: "100%", padding: 10, marginTop: 6, marginBottom: 14 }}
-      />
+      {message && <p style={{ color: "green" }}>{message}</p>}
+      {error && <p style={{ color: "crimson" }}>{error}</p>}
 
-      <label>Password</label>
-      <input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="min 8 chars"
-        style={{ width: "100%", padding: 10, marginTop: 6, marginBottom: 14 }}
-      />
+      {step === "form" && (
+        <>
+          <label>Email</label>
+          <input
+            style={{ width: "100%", padding: 8, margin: "6px 0 12px" }}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="ina06@mail.aub.edu"
+          />
 
-      <button
-        onClick={handleRegister}
-        disabled={loading}
-        style={{ width: "100%", padding: 10 }}
-      >
-        {loading ? "Creating..." : "Create account"}
-      </button>
+          <label>Password</label>
+          <input
+            style={{ width: "100%", padding: 8, margin: "6px 0 12px" }}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Min 8 chars"
+          />
 
-      {error && <p style={{ marginTop: 12, color: "crimson" }}>{error}</p>}
-      {success && <p style={{ marginTop: 12, color: "green" }}>{success}</p>}
+          <button onClick={handleRequestOtp} style={{ padding: 10, width: "100%" }}>
+            Request OTP
+          </button>
+        </>
+      )}
+
+      {step === "otp" && (
+        <>
+          <p>
+            We sent a 6-digit code to: <b>{email}</b>
+          </p>
+
+          <label>OTP Code</label>
+          <input
+            style={{ width: "100%", padding: 8, margin: "6px 0 12px" }}
+            value={otp}
+            onChange={(e) => setOtp(e.target.value)}
+            placeholder="123456"
+            inputMode="numeric"
+          />
+
+          <button onClick={handleVerifyOtp} style={{ padding: 10, width: "100%" }}>
+            Verify OTP
+          </button>
+
+          <button
+            onClick={async () => {
+              setError(null);
+              setMessage(null);
+              try {
+                await apiFetch<{ message: string }>("/auth/register/resend-otp", {
+                  method: "POST",
+                  body: JSON.stringify({ email }),
+                });
+                setMessage("OTP resent. Check your email.");
+              } catch (e: any) {
+                setError(e.message || "Failed to resend OTP");
+              }
+            }}
+            style={{ padding: 10, width: "100%", marginTop: 10 }}
+          >
+            Resend OTP
+          </button>
+
+
+          <button
+            onClick={() => setStep("form")}
+            style={{ padding: 10, width: "100%", marginTop: 10 }}
+          >
+            Back
+          </button>
+        </>
+      )}
     </main>
   );
 }
