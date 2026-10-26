@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AubRate: UniTok prototype
 
-## Getting Started
+The first prototype of **[UniTok](https://unitok.app)**, a social platform for AUB students. This repo holds the sign-up flow that only lets in verified `@mail.aub.edu` students, using one-time email codes. The full UniTok app was later built by our team in [cmps-271-team-2](https://github.com/cmps-271-team-2).
 
-First, run the development server:
+**Live (UniTok):** [unitok.app](https://unitok.app)
+
+## Features
+
+- **AUB-only registration:** the backend rejects any email that isn't `@mail.aub.edu`.
+- **Email OTP verification:** a 6-digit code is emailed, stored only as a bcrypt hash, and expires after a configurable time (10 minutes by default).
+- **Accounts locked until verified:** the Firebase account is created disabled and only enabled once the code checks out.
+- **Rate limiting:** wrong guesses and resend requests are both capped. Resending issues a fresh code without starting over.
+- **Next.js front end:** login and register pages that call the FastAPI backend.
+
+## Tech stack
+
+**Front end:** Next.js 16 · React 19 · TypeScript · Tailwind CSS · Firebase JS SDK
+**Back end:** Python · FastAPI · Firebase Admin / Firestore · passlib (bcrypt)
+
+## Run it locally
+
+**Backend**
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd backend
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The backend reads these environment variables. Never commit their values:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Purpose |
+| --- | --- |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | Path to your Firebase service-account JSON |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Mail server for sending codes |
+| `OTP_EXP_MINUTES` | Optional, defaults to 10 |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Frontend**
 
-## Learn More
+```bash
+cd aub-rate
+npm install
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Open http://localhost:3000. In `aub-rate/.env.local`, set `NEXT_PUBLIC_BACKEND_URL` (e.g. `http://localhost:8000`) and your Firebase web config as `NEXT_PUBLIC_FIREBASE_*` variables.
